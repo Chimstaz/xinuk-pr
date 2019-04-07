@@ -30,9 +30,16 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     }
 
     def moveCells(x: Int, y: Int, cell: GridPart): Unit = {
-      val destination = (x + random.nextInt(3) - 1, y + random.nextInt(3) - 1)
+
+      val destination = if (random.nextInt(8) == 0) {(x + random.nextInt(3) - 1, y + random.nextInt(3) - 1) } else {(0, 0)}
       val vacatedCell = EmptyCell(cell.smell)
-      val occupiedCell = MockCell.create(config.mockInitialSignal)
+      val occupiedCell =
+
+      if (destination._1 == 0 && destination._2 == 0) {
+        MockCell.create(Signal.Zero)
+      } else {
+        MockCell.create(config.mockInitialSignal)
+      }
 
       newGrid.cells(destination._1)(destination._2) match {
         case EmptyCell(_) =>
