@@ -25,7 +25,7 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     (grid, metrics)
   }
 
-  def calculatePredatorDirection(cell: PredatorCell, x: Int, y: Int, grid: Grid): Unit = {
+  def calculatePredatorDirection(cell: PredatorCell, x: Int, y: Int, grid: Grid): Iterator[(Int, Int, GridPart)] = {
     val neighbourCellCoordinates = Grid.neighbourCellCoordinates(x, y)
     Grid.SubcellCoordinates
       .map { case (i, j) => cell.smell(i)(j) }
@@ -34,7 +34,7 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
       .iterator
       .map { case (_, idx) =>
         val (i, j) = neighbourCellCoordinates(idx)
-        (i, j, grid.cells(i)(j))
+        (i - x, j - y, grid.cells(i)(j))
       }
   }
 
@@ -48,18 +48,23 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     def moveCells(x: Int, y: Int, cell: GridPart): Unit = {
       cell match {
         case MockCell(_) => moveMockCells(x, y, cell)
-        case predator@PredatorCell(_,_,_) => movePredatorCells(x, y, predator)
+        case predator@PredatorCell(_,_,_,_) => movePredatorCells(x, y, predator)
       }
     }
 
     def movePredatorCells(x: Int, y: Int, cell: PredatorCell): Unit = {
+      val loudest = calculatePredatorDirection(cell, x, y, grid).next()
 
-      val destination = if (random.nextInt(8) == 0) {(random.nextDouble() * 10 - 5, random.nextDouble() * 10 - 5)} else (0.1, 0.1)
+      //val destination = if (random.nextInt(8) == 0) {(random.nextDouble() * 10 - 5, random.nextDouble() * 10 - 5)} else (0.1, 0.1)
+
+      val smellVal = Math.min(Math.log(1 + 6 * cell.smell(loudest._1 + 1)(loudest._2 + 1).value), 10)
+      val destination = (loudest._1 * smellVal, loudest._2 * smellVal)
+
       val vacatedCell = EmptyCell(cell.smell)
 
       val move = cell.move(destination._1, destination._2)
 
-      val occupiedCell = PredatorCell.create(Signal(Math.sqrt(destination._1*destination._1 + destination._2*destination._2)), move._1, move._2)
+      val occupiedCell = PredatorCell.create(Signal(Math.sqrt(destination._1*destination._1 + destination._2*destination._2)), move._1, move._2, cell.state)
 
       if (move._3 == 0 && move._4 == 0) {
         newGrid.cells(x)(y) = occupiedCell
@@ -72,7 +77,7 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
             newGrid.cells(x)(y) = vacatedCell
             newGrid.cells(x + move._3)(y + move._4) = BufferCell(occupiedCell)
           case _ =>
-            newGrid.cells(x)(y) = PredatorCell.create(Signal.Zero, cell.x, cell.y)
+            newGrid.cells(x)(y) = PredatorCell.create(Signal.Zero, cell.x, cell.y, cell.state)
         }
       }
     }
@@ -107,7 +112,7 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
       y <- 0 until config.gridSize
     } yield (x, y, grid.cells(x)(y))).partition({
       case (_, _, MockCell(_)) => true
-      case (_, _, PredatorCell(_, _, _)) => true
+      case (_, _, PredatorCell(_, _, _, _)) => true
       case (_, _, _) => false
     })
 
