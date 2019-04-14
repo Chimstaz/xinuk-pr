@@ -1,7 +1,7 @@
 package pl.edu.agh.mock.algorithm
 
 import pl.edu.agh.mock.config.MockConfig
-import pl.edu.agh.mock.model._
+import pl.edu.agh.mock.model.{PreyCell, _}
 import pl.edu.agh.mock.simulation.MockMetrics
 import pl.edu.agh.xinuk.algorithm.MovesController
 import pl.edu.agh.xinuk.model._
@@ -16,16 +16,20 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
   override def initialGrid: (Grid, MockMetrics) = {
     val grid = Grid.empty(bufferZone)
 
-    grid.cells(config.gridSize / 4)(config.gridSize / 4) = MockCell.create(config.mockInitialSignal)
+    grid.cells(config.gridSize / 4)(config.gridSize / 4) = PreyCell.create(config.mockInitialSignal)
 
-    grid.cells(config.gridSize / 4 + 2)(config.gridSize / 4 + 2) = PredatorCell.create(config.mockInitialSignal)
+    grid.cells(config.gridSize / 4 + 20)(config.gridSize / 4 + 20) = PredatorCell.create(config.mockInitialSignal)
 
 
     val metrics = MockMetrics.empty()
     (grid, metrics)
   }
 
-  def calculatePredatorDirection(cell: PredatorCell, x: Int, y: Int, grid: Grid): Iterator[(Int, Int, GridPart)] = {
+  def getNeighbour(x: Int, y: Int, grid: Grid): Iterator[(Int, Int, GridPart)] = {
+    Grid.neighbourCellCoordinates(x, y).iterator.map(cord => (cord._1 - x, cord._2 - y, grid.cells(cord._1)(cord._2)))
+  }
+
+  def getNeighbourBySmell(cell: AnimalCell, x: Int, y: Int, grid: Grid): Iterator[(Int, Int, GridPart)] = {
     val neighbourCellCoordinates = Grid.neighbourCellCoordinates(x, y)
     Grid.SubcellCoordinates
       .map { case (i, j) => cell.smell(i)(j) }
@@ -49,43 +53,24 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
       cell match {
         case MockCell(_) => moveMockCells(x, y, cell)
         case predator@PredatorCell(_,_,_,_) => movePredatorCells(x, y, predator)
+        case prey@PreyCell(_,_,_,_) => movePreyCells(x, y, prey)
       }
     }
 
     def movePredatorCells(x: Int, y: Int, cell: PredatorCell): Unit = {
-      val loudest = calculatePredatorDirection(cell, x, y, grid).next()
+      val move2 = cell.makeMove(getNeighbourBySmell(cell, x, y, grid))
+      move2.foreach(t => newGrid.cells(x + t._1)(y + t._2) = t._3)
+    }
 
-      //val destination = if (random.nextInt(8) == 0) {(random.nextDouble() * 10 - 5, random.nextDouble() * 10 - 5)} else (0.1, 0.1)
-
-      val smellVal = Math.min(Math.log(1 + 6 * cell.smell(loudest._1 + 1)(loudest._2 + 1).value), 10)
-      val destination = (loudest._1 * smellVal, loudest._2 * smellVal)
-
-      val vacatedCell = EmptyCell(cell.smell)
-
-      val move = cell.move(destination._1, destination._2)
-
-      val occupiedCell = PredatorCell.create(Signal(Math.sqrt(destination._1*destination._1 + destination._2*destination._2)), move._1, move._2, cell.state)
-
-      if (move._3 == 0 && move._4 == 0) {
-        newGrid.cells(x)(y) = occupiedCell
-      } else {
-        newGrid.cells(x + move._3)(y + move._4) match {
-          case EmptyCell(_) =>
-            newGrid.cells(x)(y) = vacatedCell
-            newGrid.cells(x + move._3)(y + move._4) = occupiedCell
-          case BufferCell(EmptyCell(_)) =>
-            newGrid.cells(x)(y) = vacatedCell
-            newGrid.cells(x + move._3)(y + move._4) = BufferCell(occupiedCell)
-          case _ =>
-            newGrid.cells(x)(y) = PredatorCell.create(Signal.Zero, cell.x, cell.y, cell.state)
-        }
-      }
+    def movePreyCells(x: Int, y: Int, cell: PreyCell): Unit = {
+      val move2 = cell.makeMove(getNeighbourBySmell(cell, x, y, grid))
+      move2.foreach(t => newGrid.cells(x + t._1)(y + t._2) = t._3)
     }
 
 
     def moveMockCells(x: Int, y: Int, cell: GridPart): Unit = {
 
-      val destination = if (random.nextInt(8) == 0) {(x + random.nextInt(3) - 1, y + random.nextInt(3) - 1) } else {(0, 0)}
+      val destination = if (random.nextInt(2) == 0) {(x + random.nextInt(3) - 1, y + random.nextInt(3) - 1) } else {(0, 0)}
       val vacatedCell = EmptyCell(cell.smell)
       val occupiedCell =
 
@@ -113,6 +98,7 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     } yield (x, y, grid.cells(x)(y))).partition({
       case (_, _, MockCell(_)) => true
       case (_, _, PredatorCell(_, _, _, _)) => true
+      case (_, _, PreyCell(_, _, _, _)) => true
       case (_, _, _) => false
     })
 
