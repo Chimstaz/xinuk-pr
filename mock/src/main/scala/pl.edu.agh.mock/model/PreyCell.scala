@@ -1,5 +1,6 @@
 package pl.edu.agh.mock.model
 
+import javax.print.attribute.standard.Destination
 import pl.edu.agh.xinuk.model.Cell.SmellArray
 import pl.edu.agh.xinuk.model._
 
@@ -18,19 +19,36 @@ final case class PreyCell(smell: SmellArray, x: Double, y: Double, state: PreySt
   def calculateSmell(destination: (Double, Double)) =
     Array.fill(Cell.Size, Cell.Size)(Signal(calculateSmellVal(destination)))
 
+  def getNewCell(action: PreyAction.Value, destination: (Double, Double), m: (Double, Double), eat: Double, energyUsed: Double): PreyCell = {
+    copy(
+      if (action == PreyAction.Eat) {
+        Array.fill(Cell.Size, Cell.Size)(Signal(5))
+      } else {
+        calculateSmell(destination)
+      },
+      m._1, m._2,
+      state.regenerate(energyUsed, eat).changeAction(action))
+  }
+
   override def makeMove(neighbours: Iterator[(Int, Int, GridPart)]): Iterator[(Int, Int, GridPart)] = {
     val neighboursList = neighbours.toList
     val loudest = neighboursList.last
     val it = List.newBuilder[(Int, Int, GridPart)]
 
     val (destination, eat, action) =
-      if (smell(loudest._1 + 1)(loudest._2 + 1).value < -0.00001 || (smell(loudest._1 + 1)(loudest._2 + 1).value < -0.000001 && state.action == PreyAction.Run)) {
+      if (smell(loudest._1 + 1)(loudest._2 + 1).value < -0.00005 || (state.health > 50 && state.action == PreyAction.Run)) {
         // In danger, run away
         ((-8.0 * loudest._1, -8.0 * loudest._2), 0, PreyAction.Run)
       } else {
         if (state.getHealth() > 90 || (state.getHealth() > 50 && state.action == PreyAction.Walk)) {
-          // random move
-          ((getRandomMove(), getRandomMove()), 0, PreyAction.Walk)
+          if (PreyCell.random.nextInt(4) == 0) {
+            // in direction of Prey
+            ((Math.abs(getRandomMove()) * neighboursList.head._1, Math.abs(getRandomMove()) * neighboursList.head._2), 0, PreyAction.Walk)
+          }
+          else {
+            // random move
+            ((getRandomMove(), getRandomMove()), 0, PreyAction.Walk)
+          }
         } else {
           // eat
           ((0.0, 0.0), 5, PreyAction.Eat)
@@ -39,27 +57,33 @@ final case class PreyCell(smell: SmellArray, x: Double, y: Double, state: PreySt
 
     val m = move(destination._1, destination._2)
     val vacatedCell = EmptyCell(smell)
-    val occupiedCell = copy(
+    val occupiedCell = (additionalEnergyUsed: Double, p: PreyCell) => p.copy(
       if (action == PreyAction.Eat) {
         Array.fill(Cell.Size, Cell.Size)(Signal(5))
       } else {
         calculateSmell(destination)
       },
       m._1, m._2,
-      state.regenerate(calculateSmellVal(destination), eat).changeAction(action))
+      state.regenerate(calculateSmellVal(destination) + additionalEnergyUsed, eat).changeAction(action))
 
     if (m._3 == 0 && m._4 == 0) {
-      it += ((0, 0, occupiedCell))
+      it += ((0, 0, occupiedCell(0, this)))
     } else {
       neighboursList.find(p => p._1 == m._3 && p._2 == m._4).get._3 match {
         case EmptyCell(_) =>
-          it += ((0, 0, vacatedCell))
-          it += ((m._3, m._4, occupiedCell))
+          if (state.energy > 19 && PreyCell.random.nextInt(5) == 0) {
+            // Give birth
+            it += ((0, 0, PreyCell(smell, m._3 * 10, m._4 * 10, PreyState(state.energy/2, state.health, state.action))))
+            it += ((m._3, m._4, occupiedCell(state.energy/2, this)))
+          } else {
+            it += ((0, 0, vacatedCell))
+            it += ((m._3, m._4, occupiedCell(0, this)))
+          }
         case BufferCell(_) =>
           it += ((0, 0, vacatedCell))
-          it += ((m._3, m._4, BufferCell(occupiedCell)))
+          it += ((m._3, m._4, BufferCell(occupiedCell(0, this))))
         case _ =>
-          it += ((0, 0, occupiedCell))
+          it += ((0, 0, occupiedCell(0, this)))
       }
     }
 
