@@ -1,6 +1,6 @@
 package pl.edu.agh.mock.model
 
-import javax.print.attribute.standard.Destination
+import org.slf4j.LoggerFactory
 import pl.edu.agh.xinuk.model.Cell.SmellArray
 import pl.edu.agh.xinuk.model._
 
@@ -66,10 +66,17 @@ final case class PreyCell(smell: SmellArray, x: Double, y: Double, state: PreySt
       m._1, m._2,
       state.regenerate(calculateSmellVal(destination) + additionalEnergyUsed, eat).changeAction(action))
 
+    val logger = LoggerFactory.getLogger("aa")
     if (m._3 == 0 && m._4 == 0) {
       it += ((0, 0, occupiedCell(0, this)))
     } else {
       neighboursList.find(p => p._1 == m._3 && p._2 == m._4).get._3 match {
+        case predator@PredatorCell(_, _, _, _) =>
+          // Don't mind the logic with it below, the important thing is
+          // that this case never gets called and I'm not sure why
+          logger.info(s"Prey about to step on Predator.")
+          it += ((0, 0, vacatedCell))
+          it += ((m._3, m._4, predator))
         case EmptyCell(_) =>
           if (state.energy > 19 && PreyCell.random.nextInt(5) == 0) {
             // Give birth
