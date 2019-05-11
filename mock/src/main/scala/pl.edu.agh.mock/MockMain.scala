@@ -23,10 +23,14 @@ object MockMain extends LazyLogging {
       {
         case MockCell(_) => Color.WHITE
         case PreyCell(_, _, _, _) => Color.CYAN
-        case PredatorCell(smell, _, _, _) => Color.RED
+        case cell@PredatorCell(smell, _, _, _) => predatorColor(cell)
         case Obstacle => Color.BLUE
         case cell: SmellingCell => cellToColor(cell)
       }).start()
+  }
+
+  private def predatorColor(cell: PredatorCell): Color = {
+    Color.getHSBColor(0.8f, 1f, (cell.state.getHealth()/100).toFloat)
   }
 
   private def cellToColorRegions(cell: SmellingCell): Color = {

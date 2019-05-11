@@ -71,7 +71,7 @@ final case class PreyCell(smell: SmellArray, x: Double, y: Double, state: PreySt
     } else {
       neighboursList.find(p => p._1 == m._3 && p._2 == m._4).get._3 match {
         case EmptyCell(_) =>
-          if (state.energy > 19 && PreyCell.random.nextInt(5) == 0) {
+          if (state.energy > 20 || (state.energy > 19 && PreyCell.random.nextInt(5) == 0)) {
             // Give birth
             it += ((0, 0, PreyCell(smell, m._3 * 10, m._4 * 10, PreyState(state.energy/2, state.health, state.action))))
             it += ((m._3, m._4, occupiedCell(state.energy/2, this)))
@@ -103,10 +103,20 @@ object PreyAction extends Enumeration {
   val Eat, Walk, Run = Value
 }
 
-case class PreyState(energy: Double, health: Int, action: PreyAction.Value) extends AnimalState(energy, health, 1, 1, 1) {
+case class PreyState(energy: Double, health: Double, action: PreyAction.Value) extends AnimalState(energy, health, 1, 1, 1) {
   override def regenerate(usedEnergy: Double, ate: Double) = {
     val newAnimalState = super.regenerate(usedEnergy, ate)
     copy(energy = newAnimalState.getEnergy(), health = newAnimalState.getHealth())
+  }
+
+  def merge(other: PreyState) = {
+    val newEnergy = other.getEnergy() + energy
+    val newAction = if (other.action == PreyAction.Run) {
+                      PreyAction.Run
+                    } else {
+                      action
+                    }
+    copy(energy = newEnergy, health = ((health * energy + other.getEnergy() * other.getHealth()) / newEnergy), action = newAction)
   }
 
   def changeAction(action: PreyAction.Value) = {

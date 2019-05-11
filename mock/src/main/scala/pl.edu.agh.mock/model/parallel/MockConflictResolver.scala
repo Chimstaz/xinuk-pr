@@ -32,8 +32,8 @@ import pl.edu.agh.xinuk.model.parallel.ConflictResolver
         (PredatorCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
       case (MockCell(currentSmell), PredatorCell(incomingSmell, x, y, state)) =>
         (PredatorCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
-      case (PredatorCell(currentSmell, x, y, state), PredatorCell(incomingSmell, _, _, _)) =>
-        (PredatorCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
+      case (PredatorCell(currentSmell, x, y, state), PredatorCell(incomingSmell, _, _, incomingState)) =>
+        (PredatorCell(currentSmell + incomingSmell, x, y, state.merge(incomingState)), MockMetrics.empty())
 
       case (PreyCell(currentSmell, x, y, state), EmptyCell(incomingSmell)) =>
         (PreyCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
@@ -44,13 +44,13 @@ import pl.edu.agh.xinuk.model.parallel.ConflictResolver
         (PreyCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
       case (MockCell(currentSmell), PreyCell(incomingSmell, x, y, state)) =>
         (PreyCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
-      case (PreyCell(currentSmell, x, y, state), PreyCell(incomingSmell, _, _, _)) =>
-        (PreyCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
+      case (PreyCell(currentSmell, x, y, state), PreyCell(incomingSmell, _, _, incomingState)) =>
+        (PreyCell(currentSmell + incomingSmell, x, y, state.merge(incomingState)), MockMetrics.empty())
 
       case (PreyCell(currentSmell, _, _, _), PredatorCell(incomingSmell, x, y, state)) =>
-        (PredatorCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
+        (PredatorCell(currentSmell + incomingSmell, x, y, state.feed(30)), MockMetrics.empty())
       case (PredatorCell(currentSmell, x, y, state), PreyCell(incomingSmell, _, _, _)) =>
-        (PredatorCell(currentSmell + incomingSmell, x, y, state), MockMetrics.empty())
+        (PredatorCell(currentSmell + incomingSmell, x, y, state.feed(30)), MockMetrics.empty())
 
 
       case (x, y) => throw new UnsupportedOperationException(s"Unresolved conflict: $x with $y")

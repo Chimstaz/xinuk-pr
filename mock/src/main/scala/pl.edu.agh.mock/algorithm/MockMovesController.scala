@@ -1,7 +1,8 @@
 package pl.edu.agh.mock.algorithm
 
 import pl.edu.agh.mock.config.MockConfig
-import pl.edu.agh.mock.model.{PreyCell, _}
+import pl.edu.agh.mock.model.parallel.MockConflictResolver
+import pl.edu.agh.mock.model.{PredatorCell, PreyCell, _}
 import pl.edu.agh.mock.simulation.MockMetrics
 import pl.edu.agh.xinuk.algorithm.MovesController
 import pl.edu.agh.xinuk.model._
@@ -52,9 +53,39 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     def moveCells(x: Int, y: Int, cell: GridPart): Unit = {
       cell match {
         case MockCell(_) => moveMockCells(x, y, cell)
-        case predator@PredatorCell(_,_,_,_) => movePredatorCells(x, y, predator)
-        case prey@PreyCell(_,_,_,_) => movePreyCells(x, y, prey)
+        case predator@PredatorCell(_,_,_,_) => moveAnimalCells(x, y, predator)
+        case prey@PreyCell(_,_,_,_) => moveAnimalCells(x, y, prey)
       }
+    }
+
+    def moveAnimalCells(x: Int, y: Int, cell: AnimalCell): Unit = {
+      val move2 = cell.makeMove(getNeighbourBySmell(cell, x, y, grid))
+      move2.foreach(t => {
+        val smellingT = t._3 match {
+          case BufferCell(bufCell) => bufCell
+          case _ => t._3
+        }
+        val smellingGrid = newGrid.cells(x + t._1)(y + t._2) match {
+          case BufferCell(bufCell) => bufCell
+          case _ => newGrid.cells(x + t._1)(y + t._2)
+        }
+        val smellingRes = (smellingGrid, smellingT) match {
+          case (sg: SmellingCell, st: SmellingCell) =>
+            MockConflictResolver.resolveConflict(sg, st)._1
+          case _ =>
+            smellingT
+        }
+        t._3 match {
+          case BufferCell(_) =>
+            newGrid.cells(x + t._1)(y + t._2) = smellingRes match {
+              case smelling: SmellingCell => BufferCell(smelling)
+              case _ => t._3
+            }
+          case _ =>
+            newGrid.cells(x + t._1)(y + t._2) = smellingRes
+        }
+      })
+
     }
 
     def movePredatorCells(x: Int, y: Int, cell: PredatorCell): Unit = {

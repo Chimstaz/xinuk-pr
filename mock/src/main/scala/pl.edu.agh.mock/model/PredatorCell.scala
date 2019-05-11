@@ -17,17 +17,18 @@ final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: Pr
     //println(loud, calculateSmell(state.speed)(1)(1).value, loud - calculateSmell(state.speed)(1)(1).value/10000)
     loud match {
       case l if l <= 1E-30 => (0, state.action)
-      //case x if x < 3 => x * x * 6
-      case l if l < 1E-20 => (8, state.action)
-      case l if l < 1E-15 => (6, state.action)
-      case l if l < 1E-10 => (7, state.action)
-      case l if l < 1E-7 => (4, state.action)
-      case l if l < 1E-5 => (0.2, state.action)
-      case l if l < 1E-4 => (0.1, state.action)
+      case l if l < 1E-4 => (Math.pow(Math.log10(l),2) / 50.0, state.action)
+//      case l if l <= 1E-30 => (0, state.action)
+//      case l if l < 1E-20 => (8, state.action)
+//      case l if l < 1E-15 => (7, state.action)
+//      case l if l < 1E-10 => (6, state.action)
+//      case l if l < 1E-7 => (4, state.action)
+//      case l if l < 1E-5 => (1, state.action)
+//      case l if l < 1E-4 => (0.5, state.action)
       case _ => if (state.energy > 10 || state.action == PredatorAction.Run) {
         (10, PredatorAction.Run)
       } else {
-        (0.05, state.action)
+        (0.3, state.action)
       }
     }
   }
@@ -50,14 +51,19 @@ final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: Pr
     val vacatedCell = EmptyCell(smell)
 
     val m = move(destination._1, destination._2)
-    val occupiedCell = copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination), 1, destination, speed._2))
+    
+    val occupiedCell = if (state.getHealth() > 0) {
+            copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination), 0, destination, speed._2))
+          } else {
+            EmptyCell(calculateSmell(destination))
+          }
     //PredatorCell.create(Signal(-Math.sqrt(destination._1*destination._1 + destination._2*destination._2)/100), m._1, m._2, state)
 
     if (m._3 == 0 && m._4 == 0) {
       it += ((0, 0, occupiedCell))
     } else {
       (Iterator.single(loudest) ++ neighbours).find(p => p._1 == m._3 && p._2 == m._4).get._3 match {
-        case EmptyCell(_)|PreyCell(_,_,_,_) =>
+        case EmptyCell(_) | PreyCell(_,_,_,_) =>
           it += ((0, 0, vacatedCell))
           it += ((m._3, m._4, occupiedCell))
         case BufferCell(_) =>
@@ -83,10 +89,25 @@ object PredatorAction extends Enumeration {
   val Walk, Run = Value
 }
 
-case class PredatorState(energy: Double, health: Int, speed: (Double, Double), action: PredatorAction.Value) extends AnimalState(energy, health, 0.1, 1, 1) {
+case class PredatorState(energy: Double, health: Double, speed: (Double, Double), action: PredatorAction.Value) extends AnimalState(energy, health, 0.1, 1, 0.1) {
   def update(usedEnergy: Double, ate: Double, speed: (Double, Double), action: PredatorAction.Value): PredatorState = {
     val newAnimalState = super.regenerate(usedEnergy, ate)
     copy(energy = newAnimalState.getEnergy(), health = newAnimalState.getHealth(), speed = speed, action = action)
+  }
+
+  def merge(other: PredatorState) = {
+    val newEnergy = other.getEnergy() + energy
+    val (newAction, newSpeed) = if (other.action == PredatorAction.Run) {
+      (PredatorAction.Run, other.speed)
+    } else {
+      (action, speed)
+    }
+    copy(energy = newEnergy, health = ((health * energy + other.getEnergy() * other.getHealth()) / newEnergy), action = newAction, speed = newSpeed)
+  }
+
+  def feed(ate: Double): PredatorState = {
+    val newAnimalState = super.regenerate(0, ate)
+    copy(energy = newAnimalState.getEnergy(), health = newAnimalState.getHealth())
   }
 
   def changeSpeed(speed: (Double, Double)) = {

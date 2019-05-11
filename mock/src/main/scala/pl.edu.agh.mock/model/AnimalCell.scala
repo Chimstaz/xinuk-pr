@@ -27,12 +27,12 @@ object AnimalCell {
 }
 
 
-class AnimalState(energy: Double, health: Int, regenerationRate: Double, eatingEfficiency: Double, healthLose: Int) {
+class AnimalState(energy: Double, health: Double, regenerationRate: Double, eatingEfficiency: Double, healthLose: Double) {
   def getEnergy() = energy
   def getHealth() = health
 
   def regenerate(usedEnergy: Double, ate: Double): AnimalState = {
-    new AnimalState(Math.min(20, energy - usedEnergy + regenerateEnergy()), Math.min(100, health + regenerateHealth(ate)) - healthLose, regenerationRate, eatingEfficiency, healthLose)
+    new AnimalState(Math.min(Math.max(20, energy), energy - usedEnergy + regenerateEnergy()), Math.min(100, health + regenerateHealth(ate)) - healthLose, regenerationRate, eatingEfficiency, healthLose)
   }
 
   def regenerateEnergy(): Double = health match {
@@ -41,7 +41,7 @@ class AnimalState(energy: Double, health: Int, regenerationRate: Double, eatingE
     case _ => regenerationRate * 0.2
   }
 
-  def regenerateHealth(ate: Double) = (ate * eatingEfficiency).toInt
+  def regenerateHealth(ate: Double) = ate * eatingEfficiency
 }
 
 final case class MoveVector(xInsideCell: Double, yInsideCell: Double, xCell: Int, yCell: Int)
