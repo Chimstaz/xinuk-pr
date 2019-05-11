@@ -55,7 +55,7 @@ final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: Pr
     val m = move(destination._1, destination._2)
 
     val occupiedCell = (additionalEnergyUsed: Double, p: PredatorCell) => if (p.state.getHealth() > 0) {
-            p.copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination) + additionalEnergyUsed, 0, destination, speed._2))
+            p.copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination) + additionalEnergyUsed, Math.min(0.02, -0.001/calculateSmellVal(destination)), destination, speed._2))
           } else {
             EmptyCell(calculateSmell(destination))
           }
@@ -111,7 +111,7 @@ case class PredatorState(energy: Double, health: Double, speed: (Double, Double)
     } else {
       (action, speed)
     }
-    copy(energy = newEnergy, health = ((health * energy + other.getEnergy() * other.getHealth()) / newEnergy), action = newAction, speed = newSpeed)
+    copy(energy = newEnergy, health = (health * energy + other.getEnergy() * other.getHealth()) / newEnergy, action = newAction, speed = newSpeed)
   }
 
   def feed(ate: Double): PredatorState = {
