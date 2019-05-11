@@ -4,6 +4,8 @@ import javax.print.attribute.standard.Destination
 import pl.edu.agh.xinuk.model.Cell.SmellArray
 import pl.edu.agh.xinuk.model._
 
+import scala.util.Random
+
 final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: PredatorState) extends AnimalCell(smell, x, y, state) {
   override type Self = PredatorCell
 
@@ -51,26 +53,32 @@ final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: Pr
     val vacatedCell = EmptyCell(smell)
 
     val m = move(destination._1, destination._2)
-    
-    val occupiedCell = if (state.getHealth() > 0) {
-            copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination), 0, destination, speed._2))
+
+    val occupiedCell = (additionalEnergyUsed: Double, p: PredatorCell) => if (p.state.getHealth() > 0) {
+            p.copy(calculateSmell(destination), m._1, m._2, state.update(-calculateSmellVal(destination) + additionalEnergyUsed, 0, destination, speed._2))
           } else {
             EmptyCell(calculateSmell(destination))
           }
     //PredatorCell.create(Signal(-Math.sqrt(destination._1*destination._1 + destination._2*destination._2)/100), m._1, m._2, state)
 
     if (m._3 == 0 && m._4 == 0) {
-      it += ((0, 0, occupiedCell))
+      it += ((0, 0, occupiedCell(0, this)))
     } else {
       (Iterator.single(loudest) ++ neighbours).find(p => p._1 == m._3 && p._2 == m._4).get._3 match {
         case EmptyCell(_) | PreyCell(_,_,_,_) =>
-          it += ((0, 0, vacatedCell))
-          it += ((m._3, m._4, occupiedCell))
+          if (state.energy > 20 || (state.health > 96 && PredatorCell.random.nextInt(5) == 0)) {
+            // Give birth
+            it += ((0, 0, PredatorCell(smell, m._3 * 10, m._4 * 10, PredatorState(state.energy/2, state.health, (0,0), PredatorAction.Walk))))
+            it += ((m._3, m._4, occupiedCell(state.energy/2, this)))
+          } else {
+            it += ((0, 0, vacatedCell))
+            it += ((m._3, m._4, occupiedCell(0, this)))
+          }
         case BufferCell(_) =>
           it += ((0, 0, vacatedCell))
-          it += ((m._3, m._4, BufferCell(occupiedCell)))
+          it += ((m._3, m._4, BufferCell(occupiedCell(0, this))))
         case _ =>
-          it += ((0, 0, occupiedCell))
+          it += ((0, 0, occupiedCell(0, this)))
       }
     }
 
@@ -79,6 +87,7 @@ final case class PredatorCell(smell: SmellArray, x: Double, y: Double, state: Pr
 }
 
 object PredatorCell {
+  private val random = new Random(System.nanoTime())
 
   def create(initialSignal: Signal, x: Double, y: Double, state: PredatorState): PredatorCell = PredatorCell(Array.fill(Cell.Size, Cell.Size)(initialSignal), x, y, state)
 
