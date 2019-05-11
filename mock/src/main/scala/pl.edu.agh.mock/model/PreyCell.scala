@@ -60,6 +60,14 @@ final case class PreyCell(smell: SmellArray, x: Double, y: Double, state: PreySt
     val occupiedCell = (additionalEnergyUsed: Double, p: PreyCell) => p.copy(
       if (action == PreyAction.Eat) {
         Array.fill(Cell.Size, Cell.Size)(Signal(5))
+      } else if (action == PreyAction.Run && state.action != PreyAction.Run) {
+        // When start running make negative sound to give sign other Preys
+        val smell = calculateSmell(destination)
+        for ( i <- 0 until Cell.Size ) {
+          smell(loudest._1 + 1)(i) = Signal(-3)
+          smell(i)(loudest._2 + 1) = Signal(-3)
+        }
+        smell
       } else {
         calculateSmell(destination)
       },
