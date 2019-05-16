@@ -16,13 +16,10 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
 
   override def initialGrid: (Grid, MockMetrics) = {
     val grid = Grid.empty(bufferZone)
-
     grid.cells(config.gridSize / 4)(config.gridSize / 4) = PreyCell.create(config.mockInitialSignal)
-
     grid.cells(config.gridSize / 4 + 20)(config.gridSize / 4 + 20) = PredatorCell.create(config.mockInitialSignal)
 
-
-    val metrics = MockMetrics.empty()
+    val metrics = MockMetrics(1, 1)
     (grid, metrics)
   }
 
@@ -136,6 +133,27 @@ final class MockMovesController(bufferZone: TreeSet[(Int, Int)])(implicit config
     staticCells.foreach({ case (x, y, cell) => copyCells(x, y, cell) })
     dynamicCells.foreach({ case (x, y, cell) => moveCells(x, y, cell) })
 
-    (newGrid, MockMetrics.empty())
+
+    val (newDynamicCells, _) = (for {
+      x <- 0 until config.gridSize
+      y <- 0 until config.gridSize
+    } yield (x, y, newGrid.cells(x)(y))).partition({
+      case (_, _, MockCell(_)) => true
+      case (_, _, PredatorCell(_, _, _, _)) => true
+      case (_, _, PreyCell(_, _, _, _)) => true
+      case (_, _, _) => false
+    })
+
+    val predatorCount = newDynamicCells.count {
+      case (_, _, PredatorCell(_, _, _, _)) => true
+      case (_, _, _) => false
+    }
+
+    val preyCount = newDynamicCells.count {
+      case (_, _, PreyCell(_, _, _, _)) => true
+      case (_, _, _) => false
+    }
+    val metrics = MockMetrics(predatorCount, preyCount)
+    (newGrid, metrics)
   }
 }
